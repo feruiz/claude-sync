@@ -84,7 +84,6 @@ claude-sync/
 
 | File | Description |
 |------|-------------|
-| `~/.claude.json` | Global config (MCP servers, preferences) |
 | `~/.claude/settings.json` | Command permissions |
 | `~/.claude/CLAUDE.md` | Personal instructions |
 | `~/.claude/commands/` | Custom commands |
@@ -92,6 +91,7 @@ claude-sync/
 
 ## What Does NOT Get Synced
 
+- `~/.claude.json` - Contains sensitive data (account info, local paths, stats)
 - `~/.claude/.credentials.json` - Authentication (sensitive)
 - `~/.claude/plugins/marketplaces/` - Git repos cloned automatically
 - `~/.claude/projects/` - Session history (local)

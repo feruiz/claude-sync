@@ -37,11 +37,7 @@ backup_existing() {
 
     mkdir -p "$backup_dir"
 
-    # Backup ~/.claude.json if exists and is not a symlink
-    if [[ -f "$HOME/.claude.json" && ! -L "$HOME/.claude.json" ]]; then
-        cp "$HOME/.claude.json" "$backup_dir/"
-        backed_up=true
-    fi
+    # NOTE: ~/.claude.json is NOT backed up (contains sensitive data, stays local)
 
     # Backup ~/.claude/settings.json if exists and is not a symlink
     if [[ -f "$HOME/.claude/settings.json" && ! -L "$HOME/.claude/settings.json" ]]; then
@@ -80,11 +76,7 @@ copy_configs_to_repo() {
 
     mkdir -p "$config_dir/plugins"
 
-    # Copy ~/.claude.json
-    if [[ -f "$HOME/.claude.json" && ! -L "$HOME/.claude.json" ]]; then
-        cp "$HOME/.claude.json" "$config_dir/claude.json"
-        info "Copied ~/.claude.json"
-    fi
+    # NOTE: ~/.claude.json is NOT synced (contains sensitive/personal data)
 
     # Copy ~/.claude/settings.json
     if [[ -f "$HOME/.claude/settings.json" && ! -L "$HOME/.claude/settings.json" ]]; then
@@ -135,12 +127,7 @@ create_symlinks() {
     # Ensure directories exist
     mkdir -p "$HOME/.claude/plugins"
 
-    # ~/.claude.json -> repo/os/claude.json
-    if [[ -f "$config_dir/claude.json" ]]; then
-        rm -f "$HOME/.claude.json"
-        ln -s "$config_dir/claude.json" "$HOME/.claude.json"
-        success "Linked ~/.claude.json"
-    fi
+    # NOTE: ~/.claude.json is NOT synced (contains sensitive/personal data)
 
     # ~/.claude/settings.json -> repo/os/settings.json
     if [[ -f "$config_dir/settings.json" ]]; then
