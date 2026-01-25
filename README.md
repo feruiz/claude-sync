@@ -2,6 +2,33 @@
 
 A simple tool to sync your Claude Code configuration across machines using Git.
 
+## How it Works
+
+This tool uses **symlinks** (symbolic links) to sync your Claude Code configuration.
+
+### What are symlinks?
+
+Symlinks are special files that act as shortcuts pointing to another file or folder. Think of them like a shortcut on Windows or an alias on macOS, but at the filesystem level.
+
+When you run `./install.sh`, it replaces your Claude Code config files with symlinks pointing to this Git repository:
+
+```
+~/.claude/settings.json  →  ~/Projects/claude-config/linux/settings.json
+        (symlink)                        (real file in git repo)
+```
+
+Any program (including Claude Code) that reads or writes to the symlink is actually accessing the real file in your Git repo. This means:
+
+- Claude Code works normally - it doesn't know the difference
+- Changes are automatically saved to your Git repo
+- You can sync across machines with `git push` and `git pull`
+
+### Does this conflict with Claude Code updates?
+
+**No.** Claude Code updates typically update the application itself, not your personal configuration files. The symlinks remain intact and continue working after updates.
+
+In rare cases where an update might replace a symlink with a real file, simply run `./install.sh` again to restore the symlinks.
+
 ## Features
 
 - Sync Claude Code configs between Linux and macOS
