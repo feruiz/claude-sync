@@ -1,0 +1,12 @@
+[Unit]
+Description=Watch Claude Code config files for changes
+
+[Path]
+PathModified=%h/.claude.json
+PathModified=%h/.claude/settings.json
+PathModified=%h/.claude/CLAUDE.md
+PathModified=%h/.claude/plugins/known_marketplaces.json
+Unit=claude-sync.service
+
+[Install]
+WantedBy=default.target

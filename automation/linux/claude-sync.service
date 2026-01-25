@@ -1,0 +1,11 @@
+[Unit]
+Description=Claude Code config sync
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=SCRIPT_DIR/sync.sh push
+WorkingDirectory=SCRIPT_DIR
+
+[Install]
+WantedBy=default.target
