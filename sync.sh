@@ -87,9 +87,10 @@ cmd_status() {
     fi
 
     # Check if behind/ahead of remote
+    local branch=$(get_branch)
     git fetch origin &>/dev/null || true
-    local behind=$(git rev-list HEAD..origin/main --count 2>/dev/null || echo "0")
-    local ahead=$(git rev-list origin/main..HEAD --count 2>/dev/null || echo "0")
+    local behind=$(git rev-list HEAD..origin/"$branch" --count 2>/dev/null || echo "0")
+    local ahead=$(git rev-list origin/"$branch"..HEAD --count 2>/dev/null || echo "0")
 
     if [[ "$behind" -gt 0 ]]; then
         warn "Behind remote by $behind commit(s)"
@@ -102,11 +103,18 @@ cmd_status() {
     fi
 }
 
+# Get current branch name
+get_branch() {
+    git rev-parse --abbrev-ref HEAD
+}
+
 # Push changes to git
 cmd_push() {
     info "Pushing changes..."
 
     cd "$CONFIG_REPO"
+
+    local branch=$(get_branch)
 
     # Check for changes
     if [[ -z $(git status --porcelain) ]]; then
@@ -114,12 +122,18 @@ cmd_push() {
         return 0
     fi
 
-    # Pull first to avoid conflicts
-    info "Pulling latest changes..."
-    git pull --rebase origin main 2>/dev/null || {
-        error "Failed to pull. Resolve conflicts manually."
-        exit 1
-    }
+    # Pull first to avoid conflicts (if remote exists)
+    if git remote get-url origin &>/dev/null; then
+        info "Pulling latest changes..."
+        # Stash local changes, pull, then pop
+        git stash push -m "claude-sync auto-stash" 2>/dev/null || true
+        git pull --rebase origin "$branch" 2>/dev/null || {
+            git stash pop 2>/dev/null || true
+            error "Failed to pull. Resolve conflicts manually."
+            exit 1
+        }
+        git stash pop 2>/dev/null || true
+    fi
 
     # Create backup before push
     create_backup
@@ -134,7 +148,7 @@ cmd_push() {
         return 0
     }
 
-    git push origin main
+    git push origin "$branch"
     success "Changes pushed successfully"
 }
 
@@ -144,10 +158,12 @@ cmd_pull() {
 
     cd "$CONFIG_REPO"
 
+    local branch=$(get_branch)
+
     # Create backup before pull
     create_backup
 
-    git pull --rebase origin main
+    git pull --rebase origin "$branch"
     success "Changes pulled successfully"
 }
 
