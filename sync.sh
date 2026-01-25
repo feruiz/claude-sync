@@ -108,6 +108,97 @@ get_branch() {
     git rev-parse --abbrev-ref HEAD
 }
 
+# Generate README.md for the config repo
+generate_readme() {
+    local readme="$CONFIG_REPO/README.md"
+    local timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+
+    cat > "$readme" << 'HEADER'
+# Claude Code Configuration
+
+My Claude Code settings synced across machines.
+
+## Structure
+
+```
+HEADER
+
+    # Add directory tree (only tracked files)
+    cd "$CONFIG_REPO"
+    git ls-files -- '*.json' '*.md' | grep -v "README.md" | sort | while read -r file; do
+        echo "$file"
+    done >> "$readme"
+
+    cat >> "$readme" << 'MIDDLE'
+```
+
+## Configs by OS
+
+MIDDLE
+
+    # Linux section
+    if [[ -d "$CONFIG_REPO/linux" ]]; then
+        echo "### Linux" >> "$readme"
+        echo "" >> "$readme"
+
+        if [[ -f "$CONFIG_REPO/linux/settings.json" ]]; then
+            local perms=$(jq -r '.permissions.allow // [] | length' "$CONFIG_REPO/linux/settings.json" 2>/dev/null || echo "0")
+            echo "- **settings.json**: $perms allowed commands" >> "$readme"
+        fi
+
+        if [[ -f "$CONFIG_REPO/linux/CLAUDE.md" ]]; then
+            local lines=$(wc -l < "$CONFIG_REPO/linux/CLAUDE.md")
+            echo "- **CLAUDE.md**: $lines lines of custom instructions" >> "$readme"
+        fi
+
+        if [[ -d "$CONFIG_REPO/linux/commands" ]]; then
+            local cmds=$(ls "$CONFIG_REPO/linux/commands" 2>/dev/null | wc -l)
+            echo "- **commands/**: $cmds custom commands" >> "$readme"
+        fi
+
+        if [[ -f "$CONFIG_REPO/linux/plugins/known_marketplaces.json" ]]; then
+            local mkts=$(jq -r 'keys | length' "$CONFIG_REPO/linux/plugins/known_marketplaces.json" 2>/dev/null || echo "0")
+            echo "- **plugins/**: $mkts marketplace(s) installed" >> "$readme"
+        fi
+        echo "" >> "$readme"
+    fi
+
+    # macOS section (only if has tracked files)
+    if git ls-files -- 'macos/*' | grep -q .; then
+        echo "### macOS" >> "$readme"
+        echo "" >> "$readme"
+
+        if [[ -f "$CONFIG_REPO/macos/settings.json" ]]; then
+            local perms=$(jq -r '.permissions.allow // [] | length' "$CONFIG_REPO/macos/settings.json" 2>/dev/null || echo "0")
+            echo "- **settings.json**: $perms allowed commands" >> "$readme"
+        fi
+
+        if [[ -f "$CONFIG_REPO/macos/CLAUDE.md" ]]; then
+            local lines=$(wc -l < "$CONFIG_REPO/macos/CLAUDE.md")
+            echo "- **CLAUDE.md**: $lines lines of custom instructions" >> "$readme"
+        fi
+
+        if [[ -d "$CONFIG_REPO/macos/commands" ]]; then
+            local cmds=$(ls "$CONFIG_REPO/macos/commands" 2>/dev/null | wc -l)
+            echo "- **commands/**: $cmds custom commands" >> "$readme"
+        fi
+
+        if [[ -f "$CONFIG_REPO/macos/plugins/known_marketplaces.json" ]]; then
+            local mkts=$(jq -r 'keys | length' "$CONFIG_REPO/macos/plugins/known_marketplaces.json" 2>/dev/null || echo "0")
+            echo "- **plugins/**: $mkts marketplace(s) installed" >> "$readme"
+        fi
+        echo "" >> "$readme"
+    fi
+
+    cat >> "$readme" << FOOTER
+## Synced with
+
+[claude-sync](https://github.com/feruiz/claude-sync) - last updated: $timestamp
+FOOTER
+
+    info "README.md updated"
+}
+
 # Push changes to git
 cmd_push() {
     info "Pushing changes..."
@@ -116,7 +207,10 @@ cmd_push() {
 
     local branch=$(get_branch)
 
-    # Check for changes
+    # Generate/update README first
+    generate_readme
+
+    # Check for changes (after README generation)
     if [[ -z $(git status --porcelain) ]]; then
         success "Nothing to push"
         return 0
