@@ -207,14 +207,14 @@ cmd_push() {
 
     local branch=$(get_branch)
 
-    # Generate/update README first
-    generate_readme
-
-    # Check for changes (after README generation)
-    if [[ -z $(git status --porcelain) ]]; then
+    # Check for changes BEFORE generating README (exclude README.md from check)
+    if [[ -z $(git status --porcelain | grep -v "README.md") ]]; then
         success "Nothing to push"
         return 0
     fi
+
+    # Only generate README if there are real changes
+    generate_readme
 
     # Pull first to avoid conflicts (if remote exists)
     if git remote get-url origin &>/dev/null; then
