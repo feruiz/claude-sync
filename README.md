@@ -36,6 +36,8 @@ In rare cases where an update might replace a symlink with a real file, simply r
 - Optional automation (systemd on Linux, launchd on macOS)
 - Separate configs per OS (configs can differ between machines)
 
+> **Note:** Consider keeping your config repo **private** - `~/.claude.json` contains local paths that may reveal projects you're working on.
+
 ## Quick Start
 
 ```bash
@@ -111,6 +113,7 @@ claude-sync/
 
 | File | Description |
 |------|-------------|
+| `~/.claude.json` | MCP servers, project paths |
 | `~/.claude/settings.json` | Command permissions |
 | `~/.claude/CLAUDE.md` | Personal instructions |
 | `~/.claude/commands/` | Custom commands |
@@ -118,8 +121,7 @@ claude-sync/
 
 ## What Does NOT Get Synced
 
-- `~/.claude.json` - Contains sensitive data (account info, local paths, stats)
-- `~/.claude/.credentials.json` - Authentication (sensitive)
+- `~/.claude/.credentials.json` - Authentication tokens (sensitive)
 - `~/.claude/plugins/marketplaces/` - Git repos cloned automatically
 - `~/.claude/projects/` - Session history (local)
 - Cache, logs, and temporary files
