@@ -80,10 +80,23 @@ copy_configs_to_repo() {
 
     mkdir -p "$config_dir/plugins"
 
-    # Copy ~/.claude.json (mcpServers, project paths)
-    if [[ -f "$HOME/.claude.json" && ! -L "$HOME/.claude.json" ]]; then
-        cp "$HOME/.claude.json" "$config_dir/claude.json"
-        info "Copied ~/.claude.json"
+    # Filter and copy relevant fields from ~/.claude.json
+    if [[ -f "$HOME/.claude.json" ]]; then
+        jq '{
+            autoUpdates,
+            githubRepoPaths,
+            projects: (.projects // {} | to_entries | map({
+                key,
+                value: {
+                    allowedTools: .value.allowedTools,
+                    mcpServers: .value.mcpServers,
+                    mcpContextUris: .value.mcpContextUris,
+                    enabledMcpjsonServers: .value.enabledMcpjsonServers,
+                    disabledMcpjsonServers: .value.disabledMcpjsonServers
+                }
+            }) | from_entries)
+        }' "$HOME/.claude.json" > "$config_dir/claude.json"
+        info "Filtered and copied ~/.claude.json"
     fi
 
     # Copy ~/.claude/settings.json
@@ -135,12 +148,7 @@ create_symlinks() {
     # Ensure directories exist
     mkdir -p "$HOME/.claude/plugins"
 
-    # ~/.claude.json -> repo/os/claude.json
-    if [[ -f "$config_dir/claude.json" ]]; then
-        rm -f "$HOME/.claude.json"
-        ln -s "$config_dir/claude.json" "$HOME/.claude.json"
-        success "Linked ~/.claude.json"
-    fi
+    # claude.json is managed by copy+filter (not symlink) — see sync.sh
 
     # ~/.claude/settings.json -> repo/os/settings.json
     if [[ -f "$config_dir/settings.json" ]]; then

@@ -44,6 +44,45 @@ get_config_dir() {
     echo "$CONFIG_REPO/$os"
 }
 
+# Filter claude.json to keep only relevant fields
+filter_claude_json() {
+    local source="$HOME/.claude.json"
+    local dest="$(get_config_dir)/claude.json"
+
+    if [[ ! -f "$source" ]]; then return 0; fi
+
+    jq '{
+        autoUpdates,
+        githubRepoPaths,
+        projects: (.projects // {} | to_entries | map({
+            key,
+            value: {
+                allowedTools: .value.allowedTools,
+                mcpServers: .value.mcpServers,
+                mcpContextUris: .value.mcpContextUris,
+                enabledMcpjsonServers: .value.enabledMcpjsonServers,
+                disabledMcpjsonServers: .value.disabledMcpjsonServers
+            }
+        }) | from_entries)
+    }' "$source" > "$dest"
+}
+
+# Merge filtered claude.json from repo into local file
+merge_claude_json() {
+    local source="$(get_config_dir)/claude.json"
+    local target="$HOME/.claude.json"
+
+    if [[ ! -f "$source" ]]; then return 0; fi
+    if [[ ! -f "$target" ]]; then
+        cp "$source" "$target"
+        return 0
+    fi
+
+    local merged
+    merged=$(jq -s '.[0] * .[1]' "$target" "$source")
+    echo "$merged" > "$target"
+}
+
 # Create backup
 create_backup() {
     local backup_dir="$CONFIG_REPO/backups"
@@ -205,6 +244,9 @@ cmd_push() {
 
     cd "$CONFIG_REPO"
 
+    # Filter claude.json before checking for changes
+    filter_claude_json
+
     local branch=$(get_branch)
 
     # Check for changes BEFORE generating README (exclude README.md from check)
@@ -258,6 +300,10 @@ cmd_pull() {
     create_backup
 
     git pull --rebase origin "$branch"
+
+    # Merge filtered claude.json into local file
+    merge_claude_json
+
     success "Changes pulled successfully"
 }
 
