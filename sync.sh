@@ -44,13 +44,9 @@ get_config_dir() {
     echo "$CONFIG_REPO/$os"
 }
 
-# Filter claude.json to keep only relevant fields
-filter_claude_json() {
-    local source="$HOME/.claude.json"
-    local dest="$(get_config_dir)/claude.json"
-
-    if [[ ! -f "$source" ]]; then return 0; fi
-
+# Extract only relevant fields from a claude.json file (stdout, no side effects)
+extract_relevant_fields() {
+    local file="$1"
     jq '{
         autoUpdates,
         githubRepoPaths,
@@ -64,10 +60,35 @@ filter_claude_json() {
                 disabledMcpjsonServers: .value.disabledMcpjsonServers
             }
         }) | from_entries)
-    }' "$source" > "$dest"
+    }' "$file"
 }
 
-# Merge filtered claude.json from repo into local file
+# Sync claude.json: detect changes via filtered comparison, save full file
+sync_claude_json() {
+    local source="$HOME/.claude.json"
+    local dest="$(get_config_dir)/claude.json"
+
+    if [[ ! -f "$source" ]]; then return 0; fi
+
+    local local_filtered repo_filtered
+    local_filtered=$(extract_relevant_fields "$source")
+
+    if [[ -f "$dest" ]]; then
+        repo_filtered=$(extract_relevant_fields "$dest")
+    else
+        repo_filtered="{}"
+    fi
+
+    # Compare only relevant fields — skip if no meaningful change
+    if [[ "$local_filtered" == "$repo_filtered" ]]; then
+        return 0
+    fi
+
+    # Meaningful change detected — save full file
+    cp "$source" "$dest"
+}
+
+# Merge claude.json from repo into local file (only relevant fields)
 merge_claude_json() {
     local source="$(get_config_dir)/claude.json"
     local target="$HOME/.claude.json"
@@ -78,8 +99,12 @@ merge_claude_json() {
         return 0
     fi
 
+    # Extract only relevant fields from repo to avoid overwriting local telemetry
+    local filtered
+    filtered=$(extract_relevant_fields "$source")
+
     local merged
-    merged=$(jq -s '.[0] * .[1]' "$target" "$source")
+    merged=$(echo "$filtered" | jq -s '.[0] * .[1]' "$target" -)
     echo "$merged" > "$target"
 }
 
@@ -244,8 +269,8 @@ cmd_push() {
 
     cd "$CONFIG_REPO"
 
-    # Filter claude.json before checking for changes
-    filter_claude_json
+    # Sync claude.json (detect changes via filter, save full file)
+    sync_claude_json
 
     local branch=$(get_branch)
 

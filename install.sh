@@ -80,23 +80,10 @@ copy_configs_to_repo() {
 
     mkdir -p "$config_dir/plugins"
 
-    # Filter and copy relevant fields from ~/.claude.json
+    # Copy ~/.claude.json (full file — filtering is only for change detection in sync.sh)
     if [[ -f "$HOME/.claude.json" ]]; then
-        jq '{
-            autoUpdates,
-            githubRepoPaths,
-            projects: (.projects // {} | to_entries | map({
-                key,
-                value: {
-                    allowedTools: .value.allowedTools,
-                    mcpServers: .value.mcpServers,
-                    mcpContextUris: .value.mcpContextUris,
-                    enabledMcpjsonServers: .value.enabledMcpjsonServers,
-                    disabledMcpjsonServers: .value.disabledMcpjsonServers
-                }
-            }) | from_entries)
-        }' "$HOME/.claude.json" > "$config_dir/claude.json"
-        info "Filtered and copied ~/.claude.json"
+        cp "$HOME/.claude.json" "$config_dir/claude.json"
+        info "Copied ~/.claude.json"
     fi
 
     # Copy ~/.claude/settings.json

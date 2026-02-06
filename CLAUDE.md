@@ -23,7 +23,7 @@ Ferramenta de sincronização de configurações do Claude Code entre máquinas 
 
 ## Arquivos sincronizados
 
-- `~/.claude.json` — **Filtrado** (só campos relevantes, sem telemetria). Não usa symlink.
+- `~/.claude.json` — **Arquivo completo** (filtragem usada só para detecção de mudanças). Não usa symlink.
 - `~/.claude/settings.json` — Permissões, env, hooks, modelo, sandbox, plugins (symlink)
 - `~/.claude/CLAUDE.md` — Instruções pessoais (symlink)
 - `~/.claude/commands/` — Comandos customizados (symlink)
@@ -41,7 +41,7 @@ O `~/.claude.json` é um arquivo legado (deprecated desde v2.0.8, migração par
 
 **Por que é seguro filtrar:** o Claude Code regenera campos faltantes automaticamente em segundos durante a sessão. O troubleshooting oficial recomenda `rm ~/.claude.json` como reset válido. Campos de telemetria são específicos por máquina e não devem ser sincronizados.
 
-**Mecanismo:** `sync.sh` usa `jq` para extrair campos relevantes no push e `jq -s '.[0] * .[1]'` para merge no pull (campos do repo sobrescrevem os locais sem perder o resto).
+**Mecanismo:** No push, `sync.sh` usa `jq` para extrair campos relevantes do arquivo local e do repo — se forem iguais, ignora (evita commits de telemetria). Se houver diferença nos campos relevantes, copia o arquivo **completo** para o repo. No pull, extrai apenas campos relevantes do arquivo do repo e faz merge no local com `jq -s '.[0] * .[1]'` (evita sobrescrever telemetria local com dados de outra máquina).
 
 ### settings.json: arquivo atual
 
