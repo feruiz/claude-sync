@@ -38,6 +38,15 @@ success() { echo -e "${GREEN}[OK]${NC} $1"; }
 warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
+# Check if a JSON file is empty (non-existent, empty file, or just {})
+is_json_empty() {
+    local file="$1"
+    if [[ ! -f "$file" ]]; then return 0; fi
+    local content
+    content=$(tr -d '[:space:]' < "$file")
+    [[ -z "$content" || "$content" == "{}" ]]
+}
+
 # Get current OS config directory
 get_config_dir() {
     local os=$(detect_os)
@@ -465,6 +474,13 @@ cmd_push() {
 
     # Sync skills directory (copy resolved content, follows symlinks)
     sync_skills
+
+    # Protect settings.json: don't overwrite repo content with empty local
+    local os=$(detect_os)
+    local settings_file="$CONFIG_REPO/$os/settings.json"
+    if is_json_empty "$settings_file"; then
+        git checkout HEAD -- "$os/settings.json" 2>/dev/null || true
+    fi
 
     local branch=$(get_branch)
 

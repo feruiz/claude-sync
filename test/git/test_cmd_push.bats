@@ -80,6 +80,28 @@ teardown() {
     assert_output --partial "Nothing to push"
 }
 
+@test "cmd_push preserves settings.json when local becomes empty" {
+    local os_dir="$CONFIG_REPO/$(detect_os)"
+
+    # Repo has settings.json with content (from setup)
+    local original_content
+    original_content=$(cat "$os_dir/settings.json")
+
+    # Overwrite with empty JSON (simulating Claude Code reset)
+    echo '{}' > "$os_dir/settings.json"
+
+    # Also create another change so push has something to commit
+    echo '{"extra": true}' > "$os_dir/extra.json"
+
+    run cmd_push
+    assert_success
+
+    # settings.json should have been restored from HEAD
+    local restored_content
+    restored_content=$(cat "$os_dir/settings.json")
+    [[ "$restored_content" == "$original_content" ]]
+}
+
 @test "cmd_push syncs claude.json before committing" {
     # Put a local claude.json with different relevant fields
     install_fixture "claude_different.json" "$HOME/.claude.json"

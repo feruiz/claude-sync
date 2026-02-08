@@ -30,6 +30,15 @@ detect_os() {
     esac
 }
 
+# Check if a JSON file is empty (non-existent, empty file, or just {})
+is_json_empty() {
+    local file="$1"
+    if [[ ! -f "$file" ]]; then return 0; fi
+    local content
+    content=$(tr -d '[:space:]' < "$file")
+    [[ -z "$content" || "$content" == "{}" ]]
+}
+
 # Create backup of existing files
 backup_existing() {
     local backup_dir="$CONFIG_REPO/backups/pre_install_$(date +%Y%m%d_%H%M%S)"
@@ -92,10 +101,14 @@ copy_configs_to_repo() {
         info "Copied ~/.claude.json"
     fi
 
-    # Copy ~/.claude/settings.json
+    # Copy ~/.claude/settings.json (skip if local is empty and repo already has content)
     if [[ -f "$HOME/.claude/settings.json" && ! -L "$HOME/.claude/settings.json" ]]; then
-        cp "$HOME/.claude/settings.json" "$config_dir/settings.json"
-        info "Copied ~/.claude/settings.json"
+        if is_json_empty "$HOME/.claude/settings.json" && [[ -f "$config_dir/settings.json" ]] && ! is_json_empty "$config_dir/settings.json"; then
+            info "Local settings.json is empty, keeping repo version"
+        else
+            cp "$HOME/.claude/settings.json" "$config_dir/settings.json"
+            info "Copied ~/.claude/settings.json"
+        fi
     fi
 
     # Copy ~/.claude/CLAUDE.md or create template
