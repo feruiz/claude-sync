@@ -34,32 +34,8 @@ load_config() {
     fi
 }
 
-# Remove symlinks
+# Remove symlinks (only commands/ uses symlink now)
 remove_symlinks() {
-    # Remove ~/.claude.json if it's a symlink
-    if [[ -L "$HOME/.claude.json" ]]; then
-        rm "$HOME/.claude.json"
-        success "Removed symlink: ~/.claude.json"
-    fi
-
-    # Remove ~/.claude/settings.json if it's a symlink
-    if [[ -L "$HOME/.claude/settings.json" ]]; then
-        rm "$HOME/.claude/settings.json"
-        success "Removed symlink: ~/.claude/settings.json"
-    fi
-
-    # Remove ~/.claude/CLAUDE.md if it's a symlink
-    if [[ -L "$HOME/.claude/CLAUDE.md" ]]; then
-        rm "$HOME/.claude/CLAUDE.md"
-        success "Removed symlink: ~/.claude/CLAUDE.md"
-    fi
-
-    # Remove plugins/known_marketplaces.json if it's a symlink
-    if [[ -L "$HOME/.claude/plugins/known_marketplaces.json" ]]; then
-        rm "$HOME/.claude/plugins/known_marketplaces.json"
-        success "Removed symlink: known_marketplaces.json"
-    fi
-
     # Remove commands if it's a symlink
     if [[ -L "$HOME/.claude/commands" ]]; then
         rm "$HOME/.claude/commands"

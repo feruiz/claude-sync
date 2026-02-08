@@ -39,6 +39,25 @@ is_json_empty() {
     [[ -z "$content" || "$content" == "{}" ]]
 }
 
+# Migrate existing symlinks to regular files (for atomic-save compatibility)
+migrate_symlinks() {
+    local files=(
+        "$HOME/.claude/settings.json"
+        "$HOME/.claude/CLAUDE.md"
+        "$HOME/.claude/plugins/known_marketplaces.json"
+    )
+
+    for file in "${files[@]}"; do
+        if [[ -L "$file" ]]; then
+            local content
+            content=$(cat "$file" 2>/dev/null) || continue
+            rm "$file"
+            echo "$content" > "$file"
+            info "Migrated symlink to file: $file"
+        fi
+    done
+}
+
 # Create backup of existing files
 backup_existing() {
     local backup_dir="$CONFIG_REPO/backups/pre_install_$(date +%Y%m%d_%H%M%S)"
@@ -158,7 +177,7 @@ EOF
     fi
 }
 
-# Create symlinks
+# Create symlinks (only for directory-level symlinks)
 create_symlinks() {
     local os=$(detect_os)
     local config_dir="$CONFIG_REPO/$os"
@@ -166,30 +185,10 @@ create_symlinks() {
     # Ensure directories exist
     mkdir -p "$HOME/.claude/plugins"
 
-    # claude.json is managed by copy+filter (not symlink) — see sync.sh
+    # claude.json, settings.json, CLAUDE.md, known_marketplaces.json
+    # are managed by copy+merge (not symlink) — see sync.sh
 
-    # ~/.claude/settings.json -> repo/os/settings.json
-    if [[ -f "$config_dir/settings.json" ]]; then
-        rm -f "$HOME/.claude/settings.json"
-        ln -s "$config_dir/settings.json" "$HOME/.claude/settings.json"
-        success "Linked ~/.claude/settings.json"
-    fi
-
-    # ~/.claude/CLAUDE.md -> repo/os/CLAUDE.md
-    if [[ -f "$config_dir/CLAUDE.md" ]]; then
-        rm -f "$HOME/.claude/CLAUDE.md"
-        ln -s "$config_dir/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
-        success "Linked ~/.claude/CLAUDE.md"
-    fi
-
-    # ~/.claude/plugins/known_marketplaces.json -> repo/os/plugins/known_marketplaces.json
-    if [[ -f "$config_dir/plugins/known_marketplaces.json" ]]; then
-        rm -f "$HOME/.claude/plugins/known_marketplaces.json"
-        ln -s "$config_dir/plugins/known_marketplaces.json" "$HOME/.claude/plugins/known_marketplaces.json"
-        success "Linked known_marketplaces.json"
-    fi
-
-    # ~/.claude/commands -> repo/os/commands (if exists)
+    # ~/.claude/commands -> repo/os/commands (directory symlink is safe from atomic save)
     if [[ -d "$config_dir/commands" ]]; then
         rm -rf "$HOME/.claude/commands"
         ln -s "$config_dir/commands" "$HOME/.claude/commands"
@@ -290,6 +289,11 @@ main() {
     fi
 
     info "Using config repo: $CONFIG_REPO"
+
+    # Migrate existing symlinks to regular files
+    echo ""
+    info "Migrating symlinks to regular files..."
+    migrate_symlinks
 
     # Backup existing files
     echo ""

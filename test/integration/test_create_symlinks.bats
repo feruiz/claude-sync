@@ -19,51 +19,44 @@ teardown() {
     teardown_test_environment
 }
 
-@test "create_symlinks creates symlink for settings.json" {
-    run create_symlinks
-    assert_success
-    [[ -L "$HOME/.claude/settings.json" ]]
-}
-
-@test "create_symlinks creates symlink for CLAUDE.md" {
-    run create_symlinks
-    assert_success
-    [[ -L "$HOME/.claude/CLAUDE.md" ]]
-}
-
-@test "create_symlinks creates symlink for known_marketplaces.json" {
-    run create_symlinks
-    assert_success
-    [[ -L "$HOME/.claude/plugins/known_marketplaces.json" ]]
-}
-
 @test "create_symlinks creates symlink for commands directory" {
     run create_symlinks
     assert_success
     [[ -L "$HOME/.claude/commands" ]]
 }
 
-@test "create_symlinks points to correct target" {
+@test "create_symlinks does not create symlink for settings.json" {
+    run create_symlinks
+    assert_success
+    [[ ! -L "$HOME/.claude/settings.json" ]]
+}
+
+@test "create_symlinks does not create symlink for CLAUDE.md" {
+    run create_symlinks
+    assert_success
+    [[ ! -L "$HOME/.claude/CLAUDE.md" ]]
+}
+
+@test "create_symlinks does not create symlink for known_marketplaces.json" {
+    run create_symlinks
+    assert_success
+    [[ ! -L "$HOME/.claude/plugins/known_marketplaces.json" ]]
+}
+
+@test "create_symlinks points commands to correct target" {
     create_symlinks
 
     local os_dir="$CONFIG_REPO/$(detect_os)"
     local target
-    target=$(readlink "$HOME/.claude/settings.json")
-    assert_equal "$target" "$os_dir/settings.json"
+    target=$(readlink "$HOME/.claude/commands")
+    assert_equal "$target" "$os_dir/commands"
 }
 
-@test "create_symlinks replaces existing regular file" {
-    echo "old content" > "$HOME/.claude/settings.json"
-    run create_symlinks
-    assert_success
-    [[ -L "$HOME/.claude/settings.json" ]]
-}
-
-@test "create_symlinks skips missing files in repo" {
+@test "create_symlinks skips commands when not in repo" {
     local os_dir="$CONFIG_REPO/$(detect_os)"
-    rm -f "$os_dir/settings.json"
+    rm -rf "$os_dir/commands"
 
     run create_symlinks
     assert_success
-    [[ ! -L "$HOME/.claude/settings.json" ]]
+    [[ ! -L "$HOME/.claude/commands" ]]
 }

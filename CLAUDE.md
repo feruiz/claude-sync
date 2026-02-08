@@ -2,11 +2,12 @@
 
 ## O que é
 
-Ferramenta de sincronização de configurações do Claude Code entre máquinas via Git + symlinks. Os arquivos reais ficam num repositório Git e symlinks em `~/.claude/` apontam para eles.
+Ferramenta de sincronização de configurações do Claude Code entre máquinas via Git + copy/merge. Os arquivos ficam num repositório Git e são copiados de/para `~/.claude/` nos comandos push/pull.
 
 ## Arquitetura
 
-- **Symlinks** são o mecanismo central: `~/.claude/*` → `CONFIG_REPO/<os>/*`
+- **Copy+merge** é o mecanismo central para arquivos individuais (evita problemas com atomic save de editores)
+- **Symlink** apenas para `commands/` (diretório — editar arquivos dentro não quebra o symlink)
 - Configurações separadas por OS: `linux/` e `macos/`
 - Automação: systemd (Linux) / launchd (macOS) monitora mudanças e faz push automático
 - Estado salvo em `~/.claude-sync` (contém `CONFIG_REPO`)
@@ -23,11 +24,11 @@ Ferramenta de sincronização de configurações do Claude Code entre máquinas 
 
 ## Arquivos sincronizados
 
-- `~/.claude.json` — **Arquivo completo** (filtragem usada só para detecção de mudanças). Não usa symlink.
-- `~/.claude/settings.json` — Permissões, env, hooks, modelo, sandbox, plugins (symlink)
-- `~/.claude/CLAUDE.md` — Instruções pessoais (symlink)
-- `~/.claude/commands/` — Comandos customizados (symlink)
-- `~/.claude/plugins/known_marketplaces.json` — Plugins de marketplace (symlink)
+- `~/.claude.json` — **Arquivo completo** (filtragem usada só para detecção de mudanças). Copy+merge.
+- `~/.claude/settings.json` — Permissões, env, hooks, modelo, sandbox, plugins (copy+merge)
+- `~/.claude/CLAUDE.md` — Instruções pessoais (copy+merge)
+- `~/.claude/commands/` — Comandos customizados (symlink de diretório)
+- `~/.claude/plugins/known_marketplaces.json` — Plugins de marketplace (copy+merge)
 
 ### claude.json: filtragem e telemetria
 
@@ -45,7 +46,7 @@ O `~/.claude.json` é um arquivo legado (deprecated desde v2.0.8, migração par
 
 ### settings.json: arquivo atual
 
-O `~/.claude/settings.json` é o arquivo de configuração recomendado pela Anthropic. Não contém telemetria nem estado interno — apenas configurações declarativas (permissões, env, hooks, modelo, sandbox, plugins). Por isso usa symlink direto sem necessidade de filtragem.
+O `~/.claude/settings.json` é o arquivo de configuração recomendado pela Anthropic. Não contém telemetria nem estado interno — apenas configurações declarativas (permissões, env, hooks, modelo, sandbox, plugins). Usa copy+merge (não symlink) para compatibilidade com atomic save de editores (VS Code, vim escrevem em temp, deletam original, renomeiam — isso quebra symlinks).
 
 ## Convenções importantes
 
