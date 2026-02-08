@@ -250,6 +250,16 @@ merge_claude_json() {
     echo "$merged" > "$target"
 }
 
+# Compare two JSON files ignoring lastUpdated fields (recursive delete)
+json_equal_ignoring_timestamps() {
+    local file_a="$1"
+    local file_b="$2"
+    local a_stripped b_stripped
+    a_stripped=$(jq 'walk(if type == "object" then del(.lastUpdated) else . end)' "$file_a")
+    b_stripped=$(jq 'walk(if type == "object" then del(.lastUpdated) else . end)' "$file_b")
+    [[ "$a_stripped" == "$b_stripped" ]]
+}
+
 # Push a single file from local to repo (skip if identical or empty-overwrite)
 push_file() {
     local source="$1"
@@ -258,6 +268,11 @@ push_file() {
     if [[ ! -f "$source" ]]; then return 0; fi
     if [[ -f "$dest" ]] && diff -q "$source" "$dest" >/dev/null 2>&1; then return 0; fi
     if is_json_empty "$source" && [[ -f "$dest" ]] && ! is_json_empty "$dest"; then return 0; fi
+
+    # For JSON files, ignore lastUpdated-only changes
+    if [[ -f "$dest" && "$source" == *.json ]] && json_equal_ignoring_timestamps "$source" "$dest"; then
+        return 0
+    fi
 
     mkdir -p "$(dirname "$dest")"
     cp "$source" "$dest"
