@@ -233,6 +233,80 @@ EOF
     [[ "$content" == "# New content" ]]
 }
 
+# --- trailing newline differences ---
+
+@test "push_file skips when only trailing newline differs (source has, dest missing)" {
+    local source="$TEST_TEMP_DIR/source.json"
+    local dest="$TEST_TEMP_DIR/dest.json"
+
+    printf '{"key": "value"}\n' > "$source"
+    printf '{"key": "value"}' > "$dest"
+
+    local mtime_before
+    mtime_before=$(stat -c %Y "$dest" 2>/dev/null || stat -f %m "$dest")
+    sleep 1
+
+    run push_file "$source" "$dest"
+    assert_success
+
+    local mtime_after
+    mtime_after=$(stat -c %Y "$dest" 2>/dev/null || stat -f %m "$dest")
+    [[ "$mtime_before" == "$mtime_after" ]]
+}
+
+@test "push_file skips when only trailing newline differs (dest has, source missing)" {
+    local source="$TEST_TEMP_DIR/source.md"
+    local dest="$TEST_TEMP_DIR/dest.md"
+
+    printf '# Title' > "$source"
+    printf '# Title\n' > "$dest"
+
+    local mtime_before
+    mtime_before=$(stat -c %Y "$dest" 2>/dev/null || stat -f %m "$dest")
+    sleep 1
+
+    run push_file "$source" "$dest"
+    assert_success
+
+    local mtime_after
+    mtime_after=$(stat -c %Y "$dest" 2>/dev/null || stat -f %m "$dest")
+    [[ "$mtime_before" == "$mtime_after" ]]
+}
+
+@test "push_file skips when only extra blank lines at end differ" {
+    local source="$TEST_TEMP_DIR/source.md"
+    local dest="$TEST_TEMP_DIR/dest.md"
+
+    printf '# Title\n\nContent\n' > "$source"
+    printf '# Title\n\nContent\n\n' > "$dest"
+
+    local mtime_before
+    mtime_before=$(stat -c %Y "$dest" 2>/dev/null || stat -f %m "$dest")
+    sleep 1
+
+    run push_file "$source" "$dest"
+    assert_success
+
+    local mtime_after
+    mtime_after=$(stat -c %Y "$dest" 2>/dev/null || stat -f %m "$dest")
+    [[ "$mtime_before" == "$mtime_after" ]]
+}
+
+@test "push_file copies when content differs (not just trailing newline)" {
+    local source="$TEST_TEMP_DIR/source.md"
+    local dest="$TEST_TEMP_DIR/dest.md"
+
+    printf '# New Title\n' > "$source"
+    printf '# Old Title' > "$dest"
+
+    run push_file "$source" "$dest"
+    assert_success
+
+    local content
+    content=$(cat "$dest")
+    [[ "$content" == "# New Title" ]]
+}
+
 @test "push_file handles lastUpdated at top-level JSON" {
     local source="$TEST_TEMP_DIR/source.json"
     local dest="$TEST_TEMP_DIR/dest.json"
