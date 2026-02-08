@@ -58,6 +58,26 @@ teardown() {
     [[ ! -f "$os_dir/settings.json" ]]
 }
 
+@test "copy_configs_to_repo keeps repo settings.json when local is empty" {
+    local os_dir="$CONFIG_REPO/$(detect_os)"
+    mkdir -p "$os_dir"
+
+    # Repo already has settings.json with content
+    echo '{"permissions": {"allow": ["Bash", "Read"]}}' > "$os_dir/settings.json"
+
+    # Local settings.json is empty
+    echo '{}' > "$HOME/.claude/settings.json"
+
+    run copy_configs_to_repo
+    assert_success
+
+    # Repo should still have the original content
+    local perms
+    perms=$(jq '.permissions.allow | length' "$os_dir/settings.json")
+    [[ "$perms" == "2" ]]
+    assert_output --partial "keeping repo version"
+}
+
 @test "copy_configs_to_repo copies skills directory with resolved symlinks" {
     # Create a real skill
     mkdir -p "$HOME/.claude/skills/real-skill"

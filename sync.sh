@@ -38,6 +38,15 @@ success() { echo -e "${GREEN}[OK]${NC} $1"; }
 warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
+# Check if a JSON file is empty (non-existent, empty file, or just {})
+is_json_empty() {
+    local file="$1"
+    if [[ ! -f "$file" ]]; then return 0; fi
+    local content
+    content=$(tr -d '[:space:]' < "$file")
+    [[ -z "$content" || "$content" == "{}" ]]
+}
+
 # Get current OS config directory
 get_config_dir() {
     local os=$(detect_os)
@@ -239,6 +248,30 @@ merge_claude_json() {
     local merged
     merged=$(echo "$filtered" | jq -s '.[0] * .[1]' "$target" -)
     echo "$merged" > "$target"
+}
+
+# Push a single file from local to repo (skip if identical or empty-overwrite)
+push_file() {
+    local source="$1"
+    local dest="$2"
+
+    if [[ ! -f "$source" ]]; then return 0; fi
+    if [[ -f "$dest" ]] && diff -q "$source" "$dest" >/dev/null 2>&1; then return 0; fi
+    if is_json_empty "$source" && [[ -f "$dest" ]] && ! is_json_empty "$dest"; then return 0; fi
+
+    mkdir -p "$(dirname "$dest")"
+    cp "$source" "$dest"
+}
+
+# Pull a single file from repo to local
+pull_file() {
+    local source="$1"
+    local dest="$2"
+
+    if [[ ! -f "$source" ]]; then return 0; fi
+
+    mkdir -p "$(dirname "$dest")"
+    cp "$source" "$dest"
 }
 
 # Sync skills directory: copy resolved content to repo (follows symlinks)
@@ -466,6 +499,12 @@ cmd_push() {
     # Sync skills directory (copy resolved content, follows symlinks)
     sync_skills
 
+    # Copy config files from local to repo
+    local config_dir=$(get_config_dir)
+    push_file "$HOME/.claude/settings.json" "$config_dir/settings.json"
+    push_file "$HOME/.claude/CLAUDE.md" "$config_dir/CLAUDE.md"
+    push_file "$HOME/.claude/plugins/known_marketplaces.json" "$config_dir/plugins/known_marketplaces.json"
+
     local branch=$(get_branch)
 
     # Check for changes BEFORE generating README (exclude README.md from check)
@@ -522,6 +561,12 @@ cmd_pull() {
 
     # Merge filtered claude.json into local file
     merge_claude_json
+
+    # Copy config files from repo to local
+    local config_dir=$(get_config_dir)
+    pull_file "$config_dir/settings.json" "$HOME/.claude/settings.json"
+    pull_file "$config_dir/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
+    pull_file "$config_dir/plugins/known_marketplaces.json" "$HOME/.claude/plugins/known_marketplaces.json"
 
     # Merge skills from repo into local directory
     merge_skills
