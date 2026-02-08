@@ -63,7 +63,7 @@ extract_relevant_fields() {
     }' "$file"
 }
 
-# Sync claude.json: detect changes via filtered comparison, save full file
+# Sync claude.json: detect changes via filtered comparison, merge on save
 sync_claude_json() {
     local source="$HOME/.claude.json"
     local dest="$(get_config_dir)/claude.json"
@@ -84,8 +84,15 @@ sync_claude_json() {
         return 0
     fi
 
-    # Meaningful change detected — save full file
-    cp "$source" "$dest"
+    # Meaningful change detected — merge repo with local (local prevails)
+    # Preserves configs from other machines while keeping local telemetry
+    if [[ -f "$dest" ]]; then
+        local merged
+        merged=$(jq -s '.[0] * .[1]' "$dest" "$source")
+        echo "$merged" > "$dest"
+    else
+        cp "$source" "$dest"
+    fi
 }
 
 # Merge claude.json from repo into local file (only relevant fields)
