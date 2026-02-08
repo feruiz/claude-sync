@@ -63,6 +63,113 @@ extract_relevant_fields() {
     }' "$file"
 }
 
+# Detect conflicting object entries between local and repo filtered JSON
+# Returns JSON array: [{"project": "...", "field": "mcpServers", "key": "my-server"}]
+detect_conflicts() {
+    local local_json="$1"
+    local repo_json="$2"
+    jq -n --argjson l "$local_json" --argjson r "$repo_json" '
+        ["mcpServers"] as $fields |
+        [
+            $l.projects // {} | to_entries[] |
+            .key as $proj | .value as $lproj |
+            $fields[] as $field |
+            ($lproj[$field] // {}) | to_entries[] |
+            .key as $key | .value as $lval |
+            (($r.projects[$proj] // {})[$field] // {})[$key] as $rval |
+            select($rval) | select(($rval == $lval) | not) |
+            {project: $proj, field: $field, key: $key}
+        ]
+    '
+}
+
+# Check if running interactively (stdin is a terminal)
+is_interactive() { [[ -t 0 ]]; }
+
+# Prompt user to resolve a single conflict
+# Outputs: local|repo|both
+resolve_conflict() {
+    local project="$1"
+    local field="$2"
+    local key="$3"
+    local local_json="$4"
+    local repo_json="$5"
+
+    local local_val repo_val
+    local_val=$(jq -n --argjson j "$local_json" --arg p "$project" --arg f "$field" --arg k "$key" \
+        '$j.projects[$p][$f][$k]')
+    repo_val=$(jq -n --argjson j "$repo_json" --arg p "$project" --arg f "$field" --arg k "$key" \
+        '$j.projects[$p][$f][$k]')
+
+    warn "Conflict in project \"$project\" → $field → \"$key\"" >&2
+    echo "  Local:" >&2
+    echo "$local_val" | jq -C . >&2
+    echo "  Repo:" >&2
+    echo "$repo_val" | jq -C . >&2
+    echo "" >&2
+    echo "  1) Keep local (overwrite repo)" >&2
+    echo "  2) Keep repo (don't push this entry)" >&2
+    echo "  3) Keep both (repo version saved as \"${key}_repo\")" >&2
+    echo -n "  Choice [1/2/3]: " >&2
+
+    local choice
+    read -r choice </dev/tty
+    case "$choice" in
+        2) echo "repo" ;;
+        3) echo "both" ;;
+        *) echo "local" ;;
+    esac
+}
+
+# Iterate over all conflicts and resolve each one
+# Returns JSON array: [{"project", "field", "key", "action"}]
+resolve_all_conflicts() {
+    local conflicts="$1"
+    local local_json="$2"
+    local repo_json="$3"
+
+    local count
+    count=$(echo "$conflicts" | jq 'length')
+
+    local results="[]"
+    for ((i=0; i<count; i++)); do
+        local project field key
+        project=$(echo "$conflicts" | jq -r ".[$i].project")
+        field=$(echo "$conflicts" | jq -r ".[$i].field")
+        key=$(echo "$conflicts" | jq -r ".[$i].key")
+
+        local action
+        action=$(resolve_conflict "$project" "$field" "$key" "$local_json" "$repo_json")
+
+        results=$(echo "$results" | jq \
+            --arg p "$project" --arg f "$field" --arg k "$key" --arg a "$action" \
+            '. + [{project: $p, field: $f, key: $k, action: $a}]')
+    done
+    echo "$results"
+}
+
+# Apply conflict resolution overrides to the merged JSON
+# "local" → noop (local already wins in merge)
+# "repo"  → restore original repo value
+# "both"  → add {key}_repo with repo value
+apply_overrides() {
+    local merged="$1"
+    local dest_original="$2"
+    local overrides="$3"
+
+    jq -n --argjson m "$merged" --argjson d "$dest_original" --argjson o "$overrides" '
+        reduce $o[] as $ov ($m;
+            if $ov.action == "repo" then
+                .projects[$ov.project][$ov.field][$ov.key] = $d.projects[$ov.project][$ov.field][$ov.key]
+            elif $ov.action == "both" then
+                .projects[$ov.project][$ov.field]["\($ov.key)_repo"] = $d.projects[$ov.project][$ov.field][$ov.key]
+            else
+                .
+            end
+        )
+    '
+}
+
 # Sync claude.json: detect changes via filtered comparison, merge on save
 sync_claude_json() {
     local source="$HOME/.claude.json"
@@ -89,6 +196,25 @@ sync_claude_json() {
     if [[ -f "$dest" ]]; then
         local merged
         merged=$(jq -s '.[0] * .[1]' "$dest" "$source")
+
+        # Detect conflicts (same key, different value in object fields)
+        local conflicts
+        conflicts=$(detect_conflicts "$local_filtered" "$repo_filtered")
+        local conflict_count
+        conflict_count=$(echo "$conflicts" | jq 'length')
+
+        if [[ "$conflict_count" -gt 0 ]]; then
+            if is_interactive; then
+                local overrides
+                overrides=$(resolve_all_conflicts "$conflicts" "$local_filtered" "$repo_filtered")
+                local dest_original
+                dest_original=$(cat "$dest")
+                merged=$(apply_overrides "$merged" "$dest_original" "$overrides")
+            else
+                info "Non-interactive: $conflict_count conflict(s) detected, local version wins"
+            fi
+        fi
+
         echo "$merged" > "$dest"
     else
         cp "$source" "$dest"
