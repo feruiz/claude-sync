@@ -405,8 +405,9 @@ get_branch() {
 generate_readme() {
     local readme="$CONFIG_REPO/README.md"
     local timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+    local tmp_readme="${readme}.tmp"
 
-    cat > "$readme" << 'HEADER'
+    cat > "$tmp_readme" << 'HEADER'
 # Claude Code Configuration
 
 My Claude Code settings synced across machines.
@@ -420,9 +421,9 @@ HEADER
     cd "$CONFIG_REPO"
     git ls-files -- '*.json' '*.md' | grep -v "README.md" | sort | while read -r file; do
         echo "$file"
-    done >> "$readme"
+    done >> "$tmp_readme"
 
-    cat >> "$readme" << 'MIDDLE'
+    cat >> "$tmp_readme" << 'MIDDLE'
 ```
 
 ## Configs by OS
@@ -431,74 +432,86 @@ MIDDLE
 
     # Linux section
     if [[ -d "$CONFIG_REPO/linux" ]]; then
-        echo "### Linux" >> "$readme"
-        echo "" >> "$readme"
+        echo "### Linux" >> "$tmp_readme"
+        echo "" >> "$tmp_readme"
 
         if [[ -f "$CONFIG_REPO/linux/settings.json" ]]; then
             local perms=$(jq -r '.permissions.allow // [] | length' "$CONFIG_REPO/linux/settings.json" 2>/dev/null || echo "0")
-            echo "- **settings.json**: $perms allowed commands" >> "$readme"
+            echo "- **settings.json**: $perms allowed commands" >> "$tmp_readme"
         fi
 
         if [[ -f "$CONFIG_REPO/linux/CLAUDE.md" ]]; then
             local lines=$(wc -l < "$CONFIG_REPO/linux/CLAUDE.md")
-            echo "- **CLAUDE.md**: $lines lines of custom instructions" >> "$readme"
+            echo "- **CLAUDE.md**: $lines lines of custom instructions" >> "$tmp_readme"
         fi
 
         if [[ -d "$CONFIG_REPO/linux/commands" ]]; then
             local cmds=$(ls "$CONFIG_REPO/linux/commands" 2>/dev/null | wc -l)
-            echo "- **commands/**: $cmds custom commands" >> "$readme"
+            echo "- **commands/**: $cmds custom commands" >> "$tmp_readme"
         fi
 
         if [[ -f "$CONFIG_REPO/linux/plugins/known_marketplaces.json" ]]; then
             local mkts=$(jq -r 'keys | length' "$CONFIG_REPO/linux/plugins/known_marketplaces.json" 2>/dev/null || echo "0")
-            echo "- **plugins/**: $mkts marketplace(s) installed" >> "$readme"
+            echo "- **plugins/**: $mkts marketplace(s) installed" >> "$tmp_readme"
         fi
 
         if [[ -d "$CONFIG_REPO/linux/skills" ]]; then
             local skills_count=$(ls -d "$CONFIG_REPO/linux/skills"/*/ 2>/dev/null | wc -l)
-            echo "- **skills/**: $skills_count skill(s) synced" >> "$readme"
+            echo "- **skills/**: $skills_count skill(s) synced" >> "$tmp_readme"
         fi
-        echo "" >> "$readme"
+        echo "" >> "$tmp_readme"
     fi
 
     # macOS section (only if has tracked files)
     if git ls-files -- 'macos/*' | grep -q .; then
-        echo "### macOS" >> "$readme"
-        echo "" >> "$readme"
+        echo "### macOS" >> "$tmp_readme"
+        echo "" >> "$tmp_readme"
 
         if [[ -f "$CONFIG_REPO/macos/settings.json" ]]; then
             local perms=$(jq -r '.permissions.allow // [] | length' "$CONFIG_REPO/macos/settings.json" 2>/dev/null || echo "0")
-            echo "- **settings.json**: $perms allowed commands" >> "$readme"
+            echo "- **settings.json**: $perms allowed commands" >> "$tmp_readme"
         fi
 
         if [[ -f "$CONFIG_REPO/macos/CLAUDE.md" ]]; then
             local lines=$(wc -l < "$CONFIG_REPO/macos/CLAUDE.md")
-            echo "- **CLAUDE.md**: $lines lines of custom instructions" >> "$readme"
+            echo "- **CLAUDE.md**: $lines lines of custom instructions" >> "$tmp_readme"
         fi
 
         if [[ -d "$CONFIG_REPO/macos/commands" ]]; then
             local cmds=$(ls "$CONFIG_REPO/macos/commands" 2>/dev/null | wc -l)
-            echo "- **commands/**: $cmds custom commands" >> "$readme"
+            echo "- **commands/**: $cmds custom commands" >> "$tmp_readme"
         fi
 
         if [[ -f "$CONFIG_REPO/macos/plugins/known_marketplaces.json" ]]; then
             local mkts=$(jq -r 'keys | length' "$CONFIG_REPO/macos/plugins/known_marketplaces.json" 2>/dev/null || echo "0")
-            echo "- **plugins/**: $mkts marketplace(s) installed" >> "$readme"
+            echo "- **plugins/**: $mkts marketplace(s) installed" >> "$tmp_readme"
         fi
 
         if [[ -d "$CONFIG_REPO/macos/skills" ]]; then
             local skills_count=$(ls -d "$CONFIG_REPO/macos/skills"/*/ 2>/dev/null | wc -l)
-            echo "- **skills/**: $skills_count skill(s) synced" >> "$readme"
+            echo "- **skills/**: $skills_count skill(s) synced" >> "$tmp_readme"
         fi
-        echo "" >> "$readme"
+        echo "" >> "$tmp_readme"
     fi
 
-    cat >> "$readme" << FOOTER
+    cat >> "$tmp_readme" << FOOTER
 ## Synced with
 
 [claude-sync](https://github.com/feruiz/claude-sync) - last updated: $timestamp
 FOOTER
 
+    # Only overwrite README if content changed (ignoring timestamp line)
+    if [[ -f "$readme" ]]; then
+        local old_content new_content
+        old_content=$(grep -v "^.*last updated:" "$readme")
+        new_content=$(grep -v "^.*last updated:" "$tmp_readme")
+        if [[ "$old_content" == "$new_content" ]]; then
+            rm -f "$tmp_readme"
+            return 0
+        fi
+    fi
+
+    mv "$tmp_readme" "$readme"
     info "README.md updated"
 }
 
