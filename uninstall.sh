@@ -110,6 +110,11 @@ restore_from_backup() {
         cp -r "$latest_backup/commands" "$HOME/.claude/"
         success "Restored commands directory"
     fi
+
+    if [[ -d "$latest_backup/skills" ]]; then
+        cp -r "$latest_backup/skills" "$HOME/.claude/"
+        success "Restored skills directory"
+    fi
 }
 
 # Remove automation

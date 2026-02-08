@@ -68,6 +68,12 @@ backup_existing() {
         backed_up=true
     fi
 
+    # Backup skills directory if exists and is a real directory (not a symlink)
+    if [[ -d "$HOME/.claude/skills" && ! -L "$HOME/.claude/skills" ]]; then
+        cp -r "$HOME/.claude/skills" "$backup_dir/"
+        backed_up=true
+    fi
+
     if $backed_up; then
         success "Existing files backed up to: $backup_dir"
     fi
@@ -124,6 +130,18 @@ EOF
     if [[ -d "$HOME/.claude/commands" && ! -L "$HOME/.claude/commands" ]]; then
         cp -r "$HOME/.claude/commands" "$config_dir/"
         info "Copied commands directory"
+    fi
+
+    # Copy skills directory if exists (cp -rL follows symlinks to store actual content)
+    if [[ -d "$HOME/.claude/skills" ]]; then
+        mkdir -p "$config_dir/skills"
+        for skill_dir in "$HOME/.claude/skills"/*/; do
+            [[ -d "$skill_dir" ]] || continue
+            local name
+            name=$(basename "$skill_dir")
+            cp -rL "$skill_dir" "$config_dir/skills/$name"
+        done
+        info "Copied skills directory"
     fi
 }
 

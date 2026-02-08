@@ -52,3 +52,25 @@ teardown() {
     backup_dir=$(ls -d "$CONFIG_REPO/backups"/pre_install_* 2>/dev/null | head -n 1)
     [[ -d "$backup_dir/commands" ]]
 }
+
+@test "backup_existing backs up skills directory" {
+    mkdir -p "$HOME/.claude/skills/my-skill"
+    echo '# My Skill' > "$HOME/.claude/skills/my-skill/SKILL.md"
+    run backup_existing
+    assert_success
+
+    local backup_dir
+    backup_dir=$(ls -d "$CONFIG_REPO/backups"/pre_install_* 2>/dev/null | head -n 1)
+    [[ -d "$backup_dir/skills" ]]
+    [[ -f "$backup_dir/skills/my-skill/SKILL.md" ]]
+}
+
+@test "backup_existing skips skills directory when it is a symlink" {
+    ln -s "/some/target" "$HOME/.claude/skills"
+    run backup_existing
+    assert_success
+
+    local backup_dir
+    backup_dir=$(ls -d "$CONFIG_REPO/backups"/pre_install_* 2>/dev/null | head -n 1)
+    [[ -z "$backup_dir" ]] || [[ ! -d "$backup_dir/skills" ]]
+}

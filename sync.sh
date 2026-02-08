@@ -241,6 +241,54 @@ merge_claude_json() {
     echo "$merged" > "$target"
 }
 
+# Sync skills directory: copy resolved content to repo (follows symlinks)
+sync_skills() {
+    local source="$HOME/.claude/skills"
+    local dest="$(get_config_dir)/skills"
+
+    if [[ ! -d "$source" ]]; then return 0; fi
+
+    mkdir -p "$dest"
+
+    # Copy each skill dir (cp -rL follows symlinks, stores actual content)
+    for skill_dir in "$source"/*/; do
+        [[ -d "$skill_dir" ]] || continue
+        local name
+        name=$(basename "$skill_dir")
+        rm -rf "$dest/$name"
+        cp -rL "$skill_dir" "$dest/$name"
+    done
+
+    # Remove skills from repo that no longer exist locally
+    for repo_skill in "$dest"/*/; do
+        [[ -d "$repo_skill" ]] || continue
+        local name
+        name=$(basename "$repo_skill")
+        if [[ ! -d "$source/$name" ]]; then
+            rm -rf "$repo_skill"
+        fi
+    done
+}
+
+# Merge skills from repo into local directory (additive, does not remove local skills)
+merge_skills() {
+    local source="$(get_config_dir)/skills"
+    local target="$HOME/.claude/skills"
+
+    if [[ ! -d "$source" ]]; then return 0; fi
+
+    mkdir -p "$target"
+
+    for skill_dir in "$source"/*/; do
+        [[ -d "$skill_dir" ]] || continue
+        local name
+        name=$(basename "$skill_dir")
+        # Overwrite existing skill with repo version, or add new ones
+        rm -rf "$target/$name"
+        cp -r "$skill_dir" "$target/$name"
+    done
+}
+
 # Create backup
 create_backup() {
     local backup_dir="$CONFIG_REPO/backups"
@@ -357,6 +405,11 @@ MIDDLE
             local mkts=$(jq -r 'keys | length' "$CONFIG_REPO/linux/plugins/known_marketplaces.json" 2>/dev/null || echo "0")
             echo "- **plugins/**: $mkts marketplace(s) installed" >> "$readme"
         fi
+
+        if [[ -d "$CONFIG_REPO/linux/skills" ]]; then
+            local skills_count=$(ls -d "$CONFIG_REPO/linux/skills"/*/ 2>/dev/null | wc -l)
+            echo "- **skills/**: $skills_count skill(s) synced" >> "$readme"
+        fi
         echo "" >> "$readme"
     fi
 
@@ -384,6 +437,11 @@ MIDDLE
             local mkts=$(jq -r 'keys | length' "$CONFIG_REPO/macos/plugins/known_marketplaces.json" 2>/dev/null || echo "0")
             echo "- **plugins/**: $mkts marketplace(s) installed" >> "$readme"
         fi
+
+        if [[ -d "$CONFIG_REPO/macos/skills" ]]; then
+            local skills_count=$(ls -d "$CONFIG_REPO/macos/skills"/*/ 2>/dev/null | wc -l)
+            echo "- **skills/**: $skills_count skill(s) synced" >> "$readme"
+        fi
         echo "" >> "$readme"
     fi
 
@@ -404,6 +462,9 @@ cmd_push() {
 
     # Sync claude.json (detect changes via filter, save full file)
     sync_claude_json
+
+    # Sync skills directory (copy resolved content, follows symlinks)
+    sync_skills
 
     local branch=$(get_branch)
 
@@ -461,6 +522,9 @@ cmd_pull() {
 
     # Merge filtered claude.json into local file
     merge_claude_json
+
+    # Merge skills from repo into local directory
+    merge_skills
 
     success "Changes pulled successfully"
 }

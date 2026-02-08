@@ -57,3 +57,26 @@ teardown() {
     local os_dir="$CONFIG_REPO/$(detect_os)"
     [[ ! -f "$os_dir/settings.json" ]]
 }
+
+@test "copy_configs_to_repo copies skills directory with resolved symlinks" {
+    # Create a real skill
+    mkdir -p "$HOME/.claude/skills/real-skill"
+    echo "# Real Skill" > "$HOME/.claude/skills/real-skill/SKILL.md"
+
+    # Create a symlinked skill (simulating marketplace install)
+    local agents_dir="$TEST_TEMP_DIR/agents/skills/market-skill"
+    mkdir -p "$agents_dir"
+    echo "# Market Skill" > "$agents_dir/SKILL.md"
+    ln -s "$agents_dir" "$HOME/.claude/skills/market-skill"
+
+    run copy_configs_to_repo
+    assert_success
+
+    local os_dir="$CONFIG_REPO/$(detect_os)"
+    [[ -d "$os_dir/skills/real-skill" ]]
+    [[ -d "$os_dir/skills/market-skill" ]]
+    # Symlink should be resolved (regular directory in repo)
+    [[ ! -L "$os_dir/skills/market-skill" ]]
+    [[ -f "$os_dir/skills/market-skill/SKILL.md" ]]
+    assert_output --partial "Copied skills directory"
+}
