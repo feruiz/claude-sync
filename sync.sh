@@ -266,7 +266,8 @@ push_file() {
     local dest="$2"
 
     if [[ ! -f "$source" ]]; then return 0; fi
-    if [[ -f "$dest" ]] && diff -q "$source" "$dest" >/dev/null 2>&1; then return 0; fi
+    # Compare ignoring trailing newline differences ($(cat) strips trailing newlines)
+    if [[ -f "$dest" ]] && [[ "$(cat "$source")" == "$(cat "$dest")" ]]; then return 0; fi
     if is_json_empty "$source" && [[ -f "$dest" ]] && ! is_json_empty "$dest"; then return 0; fi
 
     # For JSON files, ignore lastUpdated-only changes
