@@ -54,3 +54,39 @@ teardown() {
     assert_output --partial "CLAUDE.md"
     assert_output --partial "lines of custom instructions"
 }
+
+@test "generate_readme does not overwrite when only timestamp changes" {
+    generate_readme
+
+    local mtime_before
+    mtime_before=$(stat -c %Y "$CONFIG_REPO/README.md" 2>/dev/null || stat -f %m "$CONFIG_REPO/README.md")
+    sleep 1
+
+    # Regenerate — only the timestamp should differ
+    generate_readme
+
+    local mtime_after
+    mtime_after=$(stat -c %Y "$CONFIG_REPO/README.md" 2>/dev/null || stat -f %m "$CONFIG_REPO/README.md")
+    [[ "$mtime_before" == "$mtime_after" ]]
+}
+
+@test "generate_readme overwrites when stats change" {
+    generate_readme
+
+    local mtime_before
+    mtime_before=$(stat -c %Y "$CONFIG_REPO/README.md" 2>/dev/null || stat -f %m "$CONFIG_REPO/README.md")
+    sleep 1
+
+    # Add a new config file so stats change
+    local os_dir="$CONFIG_REPO/$(detect_os)"
+    mkdir -p "$os_dir/commands"
+    echo "test command" > "$os_dir/commands/test.md"
+    git -C "$CONFIG_REPO" add -A
+    git -C "$CONFIG_REPO" commit -m "add command" 2>/dev/null
+
+    generate_readme
+
+    local mtime_after
+    mtime_after=$(stat -c %Y "$CONFIG_REPO/README.md" 2>/dev/null || stat -f %m "$CONFIG_REPO/README.md")
+    [[ "$mtime_before" != "$mtime_after" ]]
+}
