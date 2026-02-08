@@ -1,0 +1,25 @@
+{
+  "autoUpdates": true,
+  "githubRepoPaths": ["/home/user/projects/repo1", "/home/user/projects/repo2"],
+  "projects": {
+    "/home/user/projects/repo1": {
+      "allowedTools": ["Bash", "Read", "Write"],
+      "mcpServers": {
+        "myserver": {
+          "command": "npx",
+          "args": ["-y", "my-mcp-server"]
+        }
+      },
+      "mcpContextUris": ["https://example.com/context"],
+      "enabledMcpjsonServers": ["server1"],
+      "disabledMcpjsonServers": ["server2"]
+    },
+    "/home/user/projects/repo2": {
+      "allowedTools": ["Read"],
+      "mcpServers": {},
+      "mcpContextUris": null,
+      "enabledMcpjsonServers": null,
+      "disabledMcpjsonServers": null
+    }
+  }
+}

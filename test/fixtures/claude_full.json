@@ -1,0 +1,34 @@
+{
+  "autoUpdates": true,
+  "githubRepoPaths": ["/home/user/projects/repo1", "/home/user/projects/repo2"],
+  "numStartups": 42,
+  "tipsHistory": ["tip1", "tip2"],
+  "userID": "user-abc-123",
+  "lastSessionId": "session-xyz",
+  "lastCost": 0.05,
+  "lastDuration": 300,
+  "cachedGrowthBookFeatures": {"feature1": true},
+  "changelogLastFetched": "2025-01-01",
+  "skillUsage": {"commit": 5},
+  "projectOnboardingSeenCount": 3,
+  "projects": {
+    "/home/user/projects/repo1": {
+      "allowedTools": ["Bash", "Read", "Write"],
+      "mcpServers": {
+        "myserver": {
+          "command": "npx",
+          "args": ["-y", "my-mcp-server"]
+        }
+      },
+      "mcpContextUris": ["https://example.com/context"],
+      "enabledMcpjsonServers": ["server1"],
+      "disabledMcpjsonServers": ["server2"],
+      "hasCompletedProjectOnboarding": true
+    },
+    "/home/user/projects/repo2": {
+      "allowedTools": ["Read"],
+      "mcpServers": {},
+      "hasCompletedProjectOnboarding": false
+    }
+  }
+}

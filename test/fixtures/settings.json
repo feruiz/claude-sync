@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git *)",
+      "Bash(npm test)",
+      "Read",
+      "Write"
+    ],
+    "deny": []
+  },
+  "env": {
+    "EDITOR": "vim"
+  }
+}

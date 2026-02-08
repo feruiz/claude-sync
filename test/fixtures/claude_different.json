@@ -1,0 +1,13 @@
+{
+  "autoUpdates": false,
+  "githubRepoPaths": ["/home/user/projects/repo1"],
+  "numStartups": 10,
+  "userID": "other-user",
+  "projects": {
+    "/home/user/projects/repo1": {
+      "allowedTools": ["Bash"],
+      "mcpServers": {},
+      "hasCompletedProjectOnboarding": true
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "https://marketplace.example.com": {
+    "name": "Example Marketplace",
+    "trusted": true
+  }
+}
