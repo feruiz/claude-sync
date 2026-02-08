@@ -106,6 +106,173 @@ teardown() {
     assert_equal "$keys_count" "$full_keys_count"
 }
 
+@test "sync_claude_json auto-resolves conflicts when non-interactive (local wins)" {
+    local os_dir
+    os_dir=$(get_config_dir)
+
+    # Repo has an mcpServer with different config
+    cat > "$os_dir/claude.json" << 'EOF'
+{
+  "autoUpdates": true,
+  "projects": {
+    "/proj": {
+      "allowedTools": ["Read"],
+      "mcpServers": {
+        "srv": {
+          "command": "repo-cmd",
+          "args": ["--repo"]
+        }
+      }
+    }
+  }
+}
+EOF
+
+    # Local has same server with different config
+    cat > "$HOME/.claude.json" << 'EOF'
+{
+  "autoUpdates": true,
+  "projects": {
+    "/proj": {
+      "allowedTools": ["Read"],
+      "mcpServers": {
+        "srv": {
+          "command": "local-cmd",
+          "args": ["--local"]
+        }
+      }
+    }
+  }
+}
+EOF
+
+    # Override is_interactive to return false (non-TTY)
+    is_interactive() { return 1; }
+
+    run sync_claude_json
+    assert_success
+
+    # Local should win (default non-interactive behavior)
+    local cmd
+    cmd=$(jq -r '.projects["/proj"].mcpServers.srv.command' "$os_dir/claude.json")
+    assert_equal "$cmd" "local-cmd"
+}
+
+@test "sync_claude_json applies repo override when is_interactive returns conflict resolution" {
+    local os_dir
+    os_dir=$(get_config_dir)
+
+    # Repo has server with repo config
+    cat > "$os_dir/claude.json" << 'EOF'
+{
+  "autoUpdates": true,
+  "projects": {
+    "/proj": {
+      "allowedTools": ["Read"],
+      "mcpServers": {
+        "srv": {
+          "command": "repo-cmd",
+          "args": ["--repo"]
+        }
+      }
+    }
+  }
+}
+EOF
+
+    # Local has same server with different config
+    cat > "$HOME/.claude.json" << 'EOF'
+{
+  "autoUpdates": true,
+  "projects": {
+    "/proj": {
+      "allowedTools": ["Read"],
+      "mcpServers": {
+        "srv": {
+          "command": "local-cmd",
+          "args": ["--local"]
+        }
+      }
+    }
+  }
+}
+EOF
+
+    # Override is_interactive and resolve_all_conflicts to simulate user choosing "repo"
+    is_interactive() { return 0; }
+    resolve_all_conflicts() {
+        echo '[{"project":"/proj","field":"mcpServers","key":"srv","action":"repo"}]'
+    }
+
+    run sync_claude_json
+    assert_success
+
+    # Repo value should be restored
+    local cmd
+    cmd=$(jq -r '.projects["/proj"].mcpServers.srv.command' "$os_dir/claude.json")
+    assert_equal "$cmd" "repo-cmd"
+}
+
+@test "sync_claude_json applies both override keeping local and adding _repo suffix" {
+    local os_dir
+    os_dir=$(get_config_dir)
+
+    # Repo has server with repo config
+    cat > "$os_dir/claude.json" << 'EOF'
+{
+  "autoUpdates": true,
+  "projects": {
+    "/proj": {
+      "allowedTools": ["Read"],
+      "mcpServers": {
+        "srv": {
+          "command": "repo-cmd",
+          "args": ["--repo"]
+        }
+      }
+    }
+  }
+}
+EOF
+
+    # Local has same server with different config
+    cat > "$HOME/.claude.json" << 'EOF'
+{
+  "autoUpdates": true,
+  "projects": {
+    "/proj": {
+      "allowedTools": ["Read"],
+      "mcpServers": {
+        "srv": {
+          "command": "local-cmd",
+          "args": ["--local"]
+        }
+      }
+    }
+  }
+}
+EOF
+
+    # Override is_interactive and resolve_all_conflicts to simulate user choosing "both"
+    is_interactive() { return 0; }
+    resolve_all_conflicts() {
+        echo '[{"project":"/proj","field":"mcpServers","key":"srv","action":"both"}]'
+    }
+
+    run sync_claude_json
+    assert_success
+
+    # Local should be kept
+    local cmd
+    cmd=$(jq -r '.projects["/proj"].mcpServers.srv.command' "$os_dir/claude.json")
+    assert_equal "$cmd" "local-cmd"
+
+    # Repo should be saved with _repo suffix
+    local repo_cmd
+    repo_cmd=$(jq -r '.projects["/proj"].mcpServers.srv_repo.command' "$os_dir/claude.json")
+    assert_equal "$repo_cmd" "repo-cmd"
+}
+
 @test "sync_claude_json merges repo configs with local on push" {
     local os_dir
     os_dir=$(get_config_dir)
