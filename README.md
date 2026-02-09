@@ -1,130 +1,178 @@
-# claude-sync
+<h1 align="center">claude-sync</h1>
 
-A simple tool to sync your Claude Code configuration across machines using Git.
+<p align="center">
+  <strong>Keep your Claude Code config in sync across every machine</strong>
+</p>
 
-## How it Works
+<p align="center">
+  <a href="https://github.com/feruiz/claude-sync/actions/workflows/test.yml"><img src="https://img.shields.io/github/actions/workflow/status/feruiz/claude-sync/test.yml?branch=main&label=CI" alt="CI"></a>
+  <img src="https://img.shields.io/badge/tests-145%20passing-brightgreen" alt="Tests: 145 passing">
+  <a href="https://github.com/feruiz/claude-sync/blob/main/LICENSE"><img src="https://img.shields.io/github/license/feruiz/claude-sync" alt="License"></a>
+  <img src="https://img.shields.io/badge/made%20with-Bash-1f425f" alt="Bash">
+  <img src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS-blue" alt="Platform: Linux | macOS">
+</p>
 
-This tool uses **symlinks** (symbolic links) to sync your Claude Code configuration.
+---
 
-### What are symlinks?
+Claude Code stores its configuration in `~/.claude/` — permissions, MCP servers, personal instructions, custom commands, and more. **claude-sync** keeps all of that in a Git repo and synchronizes it across machines with a single command.
 
-Symlinks are special files that act as shortcuts pointing to another file or folder. Think of them like a shortcut on Windows or an alias on macOS, but at the filesystem level.
-
-When you run `./install.sh`, it replaces your Claude Code config files with symlinks pointing to this Git repository:
-
-```
-~/.claude/settings.json  →  ~/Projects/claude-config/linux/settings.json
-        (symlink)                        (real file in git repo)
-```
-
-Any program (including Claude Code) that reads or writes to the symlink is actually accessing the real file in your Git repo. This means:
-
-- Claude Code works normally - it doesn't know the difference
-- Changes are automatically saved to your Git repo
-- You can sync across machines with `git push` and `git pull`
-
-### Does this conflict with Claude Code updates?
-
-**No.** Claude Code updates typically update the application itself, not your personal configuration files. The symlinks remain intact and continue working after updates.
-
-In rare cases where an update might replace a symlink with a real file, simply run `./install.sh` again to restore the symlinks.
+No symlink hacks, no dotfile manager required. Just `push` and `pull`.
 
 ## Features
 
-- Sync Claude Code configs between Linux and macOS
-- Automatic backups before any destructive operation
-- Optional automation (systemd on Linux, launchd on macOS)
-- Separate configs per OS (configs can differ between machines)
-
-> **Note:** Consider keeping your config repo **private** - `~/.claude.json` contains local paths that may reveal projects you're working on.
+- **Copy + merge architecture** — files are copied (not symlinked), so editor atomic saves never break anything
+- **Smart JSON filtering** — `~/.claude.json` contains telemetry mixed with config; only relevant fields are compared and synced
+- **Conflict detection** — warns you before overwriting local changes that haven't been pushed
+- **Per-OS configs** — separate `linux/` and `macos/` directories so machines can differ
+- **Automatic backups** — every destructive operation creates a timestamped backup first
+- **Optional automation** — systemd (Linux) or launchd (macOS) watches for changes and pushes automatically
+- **One-command install/uninstall** — `./install.sh` sets everything up, `./uninstall.sh` tears it down cleanly
+- **145 tests** — unit, integration, and git-level tests via [Bats](https://github.com/bats-core/bats-core)
 
 ## Quick Start
 
-```bash
-# Clone this repo
-git clone https://github.com/yourusername/claude-sync.git ~/Projects/claude-sync
-cd ~/Projects/claude-sync
+### Prerequisites
 
-# Run the installer
+- Git
+- Bash 4+
+- [jq](https://jqlang.github.io/jq/)
+
+### Install
+
+```bash
+git clone https://github.com/feruiz/claude-sync.git ~/Projects/claude-sync
+cd ~/Projects/claude-sync
 ./install.sh
 ```
 
 The installer will:
-1. Ask for your config repo location (default: `~/Projects/claude-config`)
-2. Backup your existing Claude Code configs
-3. Copy configs to the repo
-4. Create symlinks
-5. Optionally install automation
+
+1. Create a **config repo** (default `~/Projects/claude-config`) to store your files
+2. Back up your existing Claude Code configuration
+3. Copy current configs into the repo
+4. Set up a `commands/` symlink for custom slash commands
+5. Optionally install automation (systemd / launchd)
 
 ## Usage
 
 ```bash
-# Check sync status
-./sync.sh status
-
-# Push changes to Git
-./sync.sh push
-
-# Pull changes from Git
-./sync.sh pull
-
-# Create a manual backup
-./sync.sh backup
-
-# Restore from last backup
-./sync.sh undo
-
-# List available backups
-./sync.sh backups
+./sync.sh status    # Show sync status and pending changes
+./sync.sh push      # Commit and push config changes to Git
+./sync.sh pull      # Pull latest config from Git and merge locally
+./sync.sh backup    # Create a manual backup
+./sync.sh undo      # Restore from the most recent backup
+./sync.sh backups   # List all available backups
 ```
 
-## Structure
+## How It Works
 
-### Config Repo (your data - private)
+claude-sync uses a **two-repo model**:
 
-```
-claude-config/
-├── linux/
-│   ├── claude.json          # ~/.claude.json
-│   ├── settings.json        # ~/.claude/settings.json
-│   ├── CLAUDE.md            # ~/.claude/CLAUDE.md
-│   ├── commands/            # Custom commands
-│   └── plugins/
-│       └── known_marketplaces.json
-├── macos/
-│   └── (same structure)
-└── backups/                 # (gitignored)
-```
+| Repo | Purpose | Visibility |
+|------|---------|------------|
+| **claude-sync** (this repo) | The tool itself — scripts, automation, tests | Public (safe) |
+| **claude-config** (your data) | Your actual config files, organized by OS | Private (recommended) |
 
-### This Repo (the tool - can be public)
+### Sync mechanism
 
-```
-claude-sync/
-├── install.sh               # Setup script
-├── sync.sh                  # Main sync commands
-├── uninstall.sh             # Remove everything
-├── automation/
-│   ├── linux/               # systemd units
-│   └── macos/               # launchd plist
-└── README.md
-```
+Most files use **copy + merge**: on `push`, files are copied from `~/.claude/` into the config repo; on `pull`, they're copied back. This avoids the symlink fragility that editors with atomic save (VS Code, Vim) can cause.
+
+The exception is `~/.claude/commands/` — it's a **symlink** to the config repo directory. Editing files inside a symlinked directory works fine, so this gives you real-time sync for custom commands.
+
+### JSON filtering (`~/.claude.json`)
+
+`~/.claude.json` mixes real configuration with machine-specific telemetry (`numStartups`, `tipsHistory`, `userID`, etc.). claude-sync extracts only the relevant fields for comparison:
+
+- **Top-level:** `autoUpdates`, `githubRepoPaths`
+- **Per-project:** `allowedTools`, `mcpServers`, `mcpContextUris`, `enabledMcpjsonServers`, `disabledMcpjsonServers`
+
+If only telemetry changed, the push is skipped. On pull, relevant fields are merged into your local file without overwriting machine-specific data.
 
 ## What Gets Synced
 
-| File | Description |
-|------|-------------|
-| `~/.claude.json` | MCP servers, project paths |
-| `~/.claude/settings.json` | Command permissions |
-| `~/.claude/CLAUDE.md` | Personal instructions |
-| `~/.claude/commands/` | Custom commands |
-| `~/.claude/plugins/known_marketplaces.json` | Installed marketplaces |
+| File | Method | Description |
+|------|--------|-------------|
+| `~/.claude.json` | filtered merge | MCP servers, allowed tools, project paths (telemetry ignored) |
+| `~/.claude/settings.json` | copy | Permissions, env, hooks, model, sandbox, plugins |
+| `~/.claude/CLAUDE.md` | copy | Personal instructions |
+| `~/.claude/commands/` | symlink | Custom slash commands |
+| `~/.claude/plugins/known_marketplaces.json` | copy | Registered plugin marketplaces |
+| `~/.claude/skills/` | copy | Installed skills |
 
-## What Does NOT Get Synced
+## What Doesn't Get Synced
 
-- `~/.claude/.credentials.json` - Authentication tokens (sensitive)
-- `~/.claude/plugins/marketplaces/` - Git repos cloned automatically
-- `~/.claude/projects/` - Session history (local)
-- Cache, logs, and temporary files
+| File | Reason |
+|------|--------|
+| `~/.claude/.credentials.json` | Authentication tokens — sensitive and machine-specific |
+| `~/.claude/plugins/marketplaces/` | Git repos cloned automatically per machine |
+| `~/.claude/projects/` | Session history — local to each machine |
+| Cache, logs, temp files | Ephemeral and machine-specific |
+
+## Automation
+
+### Linux (systemd)
+
+A `path` unit watches the config repo for changes and triggers a push automatically:
+
+```bash
+# Installed by ./install.sh — files in automation/linux/
+systemctl --user status claude-sync.path
+```
+
+### macOS (launchd)
+
+A `LaunchAgent` watches the config repo using `WatchPaths`:
+
+```bash
+# Installed by ./install.sh — file in automation/macos/
+launchctl list | grep claude-sync
+```
+
+## Project Structure
+
+```
+claude-sync/
+├── install.sh              # Setup: backup, copy, symlink, automation
+├── sync.sh                 # CLI: status, push, pull, backup, undo, backups
+├── uninstall.sh            # Teardown: restore backups, remove automation
+├── Makefile                # Test runner shortcuts
+├── automation/
+│   ├── linux/              # systemd path + service units
+│   └── macos/              # launchd plist
+└── test/
+    ├── run_tests.sh        # Test runner
+    ├── test_helper.bash    # Shared fixtures and helpers
+    ├── unit/               # 14 unit test files
+    ├── integration/        # 9 integration test files
+    └── git/                # 4 git-level test files
+```
+
+## Testing
+
+The test suite uses [Bats](https://github.com/bats-core/bats-core) (Bash Automated Testing System) with **145 tests** across three categories:
+
+| Category | Tests | What they cover |
+|----------|-------|-----------------|
+| Unit | `test/unit/` | Individual functions: OS detection, JSON filtering, conflict detection, file operations |
+| Integration | `test/integration/` | End-to-end workflows: backup, copy, merge, symlink creation/removal |
+| Git | `test/git/` | Full push/pull/status/undo cycles with real Git repos |
+
+```bash
+make test              # Run all tests
+make test-unit         # Unit tests only
+make test-integration  # Integration tests only
+make test-git          # Git tests only
+```
+
+## Security
+
+Your config repo may contain:
+
+- Local file paths (in `~/.claude.json`)
+- MCP server configurations
+- Custom tool permissions
+
+**Keep your config repo private.** The tool itself (this repo) is safe to be public.
 
 ## Uninstall
 
@@ -132,10 +180,7 @@ claude-sync/
 ./uninstall.sh
 ```
 
-This will:
-1. Remove symlinks
-2. Optionally restore original files from backup
-3. Remove automation (systemd/launchd)
+This removes symlinks, optionally restores original files from backup, and removes automation services.
 
 ## Inspiration
 
@@ -145,4 +190,4 @@ This will:
 
 ## License
 
-MIT
+[MIT](LICENSE) &copy; feruiz
